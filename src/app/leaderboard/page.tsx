@@ -30,7 +30,6 @@ export default function LeaderboardPage() {
     updateStationStatuses,
     getStationStats,
     getRecentOutages,
-    clearData,
     outageLog,
     isLoading: storeLoading
   } = useMaintenanceStore();
@@ -121,12 +120,6 @@ export default function LeaderboardPage() {
     }
   };
 
-  const handleClearData = async () => {
-    if (confirm("Clear all maintenance data? This cannot be undone.")) {
-      await clearData();
-    }
-  };
-
   if (!mounted) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
@@ -158,12 +151,6 @@ export default function LeaderboardPage() {
               Tracking station outages marked with $ maintenance flag
             </p>
           </div>
-          <button
-            onClick={handleClearData}
-            className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-xl text-red-400 text-sm transition-colors"
-          >
-            Clear Data
-          </button>
         </div>
 
         {/* Stats Cards */}
