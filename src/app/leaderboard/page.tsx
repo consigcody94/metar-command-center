@@ -48,11 +48,13 @@ export default function LeaderboardPage() {
   // Update maintenance store with current station statuses when METAR data updates
   useEffect(() => {
     if (allMetars && mounted && allMetars.length > 0) {
-      // Batch all updates together
+      // Batch all updates together - include observation time
       const updates = allMetars.map((metar) => ({
         icao: metar.icao,
         stationName: metar.station_name,
         hasFlag: metar.has_maintenance_flag,
+        obsTime: metar.obs_time_unix,
+        observationTime: metar.observation_time, // Zulu time string like "171553Z"
       }));
       updateStationStatuses(updates);
     }
@@ -298,7 +300,7 @@ export default function LeaderboardPage() {
                       </td>
                       <td className="p-4 text-white/60 text-sm">
                         {station.firstOutage
-                          ? format(station.firstOutage, "MMM d, HH:mm'Z'")
+                          ? format(station.firstOutage, "MMM d HH:mm'Z'")
                           : "--"}
                       </td>
                       <td className="p-4 text-white/60 text-sm">
@@ -348,8 +350,8 @@ export default function LeaderboardPage() {
                     </div>
                   </div>
                   <div className="text-xs text-white/30 mt-1">
-                    Started: {format(event.startTime, "MMM d, yyyy HH:mm:ss")}
-                    {event.endTime && ` • Ended: ${format(event.endTime, "HH:mm:ss")}`}
+                    Started: {event.startTimeZulu || format(event.startTime, "HHmmss'Z'")}
+                    {event.endTime && ` • Ended: ${event.endTimeZulu || format(event.endTime, "HHmmss'Z'")}`}
                   </div>
                 </div>
               ))

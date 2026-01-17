@@ -6,7 +6,9 @@ export interface OutageEvent {
   icao: string;
   stationName: string;
   startTime: number;
+  startTimeZulu?: string; // Zulu time string like "171553Z"
   endTime: number | null;
+  endTimeZulu?: string | null;
   duration: number | null;
 }
 
@@ -38,7 +40,7 @@ interface MaintenanceState {
   // Fetch data from server
   fetchData: () => Promise<void>;
   // Update station statuses (batched)
-  updateStationStatuses: (updates: Array<{ icao: string; stationName: string; hasFlag: boolean }>) => Promise<void>;
+  updateStationStatuses: (updates: Array<{ icao: string; stationName: string; hasFlag: boolean; obsTime: number; observationTime: string }>) => Promise<void>;
   // Get stats for leaderboard (computed from local state)
   getStationStats: () => StationStats[];
   // Get recent outage events

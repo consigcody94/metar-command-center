@@ -12,6 +12,7 @@ export interface MetarData {
   elevation_m: number;
   observed_at: string;
   observation_time: string;
+  obs_time_unix: number; // Unix timestamp of observation
   wind_direction: number | null;
   wind_speed_kt: number | null;
   wind_gust_kt: number | null;
@@ -109,6 +110,7 @@ function transformMetar(awc: AwcMetarResponse): MetarData {
     elevation_m: awc.elev ? awc.elev * 0.3048 : 0, // Convert ft to m
     observed_at: awc.reportTime || new Date().toISOString(),
     observation_time: observationTime,
+    obs_time_unix: awc.obsTime ? awc.obsTime * 1000 : Date.now(), // Convert to milliseconds
     wind_direction: typeof awc.wdir === "number" ? awc.wdir : null,
     wind_speed_kt: awc.wspd,
     wind_gust_kt: awc.wgst,
