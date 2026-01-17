@@ -11,7 +11,7 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-[Live Demo](#) · [Report Bug](https://github.com/consigcody94/metar-command-center/issues) · [Request Feature](https://github.com/consigcody94/metar-command-center/issues)
+[Live Demo](https://metar-command-center.vercel.app/) · [Report Bug](https://github.com/consigcody94/metar-command-center/issues) · [Request Feature](https://github.com/consigcody94/metar-command-center/issues)
 
 </div>
 
@@ -246,15 +246,18 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Roadmap
 
-- [ ] **TAF Support** - Terminal Aerodrome Forecasts
+- [x] **TAF Support** - Terminal Aerodrome Forecasts
 - [ ] **PIREP Integration** - Pilot Reports
-- [ ] **Interactive Map** - Visual station selection
+- [x] **Interactive Map** - Visual station selection with Leaflet
 - [ ] **Weather Radar Overlay** - Real-time radar data
 - [ ] **Route Weather** - Check weather along a flight route
-- [ ] **Favorites** - Save frequently checked stations
+- [x] **Favorites** - Save frequently checked stations
 - [ ] **Notifications** - Alerts for weather changes
 - [ ] **PWA Support** - Installable as a mobile app
 - [ ] **Historical Data** - View past METAR reports
+- [x] **Decoded METAR** - Human-readable breakdown
+- [x] **Dark/Light Theme** - User preference toggle
+- [x] **Keyboard Shortcuts** - Quick navigation
 
 ---
 
