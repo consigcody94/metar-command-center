@@ -71,12 +71,25 @@ For each station, view:
 - Dark theme optimized for readability
 
 ### 📈 ASOS Maintenance Leaderboard
-Track station outages across the US:
-- Real-time monitoring of $ maintenance flag
-- Tracks outage start/end times and duration
-- Leaderboard ranking by total outages, downtime, average duration
-- Historical outage log with timestamps
-- Server-side persistence using Vercel KV
+Track station outages across the US with the **$ maintenance flag**:
+
+| Metric | Description |
+|--------|-------------|
+| **Total Outages** | Number of times station had $ flag |
+| **Total Downtime** | Cumulative time station was down |
+| **Avg Downtime** | Average duration per outage |
+| **Longest Outage** | Maximum single outage duration |
+| **Down %** | Percentage of tracked time station was down |
+| **First Outage** | When station first had maintenance flag |
+| **Last Outage** | Most recent outage timestamp |
+
+**Features:**
+- Real-time monitoring using actual METAR Zulu times (e.g., `171656Z`)
+- Color-coded downtime percentage (🟢 <10%, 🟡 10-25%, 🟠 25-50%, 🔴 >50%)
+- Sortable columns - click any header to sort
+- Filter to show only currently down stations
+- Recent outage event log with ongoing/resolved status
+- Server-side persistence using Upstash Redis
 
 ---
 
@@ -281,7 +294,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - **[Axios](https://axios-http.com/)** - HTTP client
 - **[date-fns](https://date-fns.org/)** - Date utilities
 - **[Zustand](https://zustand-demo.pmnd.rs/)** - State management
-- **[Vercel KV](https://vercel.com/docs/storage/vercel-kv)** - Server-side Redis storage
+- **[Upstash Redis](https://upstash.com/)** - Serverless Redis for maintenance tracking
 - **[Leaflet](https://leafletjs.com/)** - Interactive maps
 
 ---
