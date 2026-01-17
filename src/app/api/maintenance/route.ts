@@ -1,5 +1,7 @@
 import { Redis } from "@upstash/redis";
 import { NextRequest, NextResponse } from "next/server";
+import { promises as fs } from "fs";
+import path from "path";
 
 export interface OutageEvent {
   icao: string;
@@ -25,19 +27,75 @@ interface MaintenanceData {
 }
 
 const MAINTENANCE_KEY = "metar-maintenance-data";
+const DATA_FILE_PATH = path.join(process.cwd(), "maintenance-data.json");
 
-// Initialize Redis from environment variables
-const redis = Redis.fromEnv();
+// Initialize Redis if environment variables are present
+let redis: Redis | null = null;
+try {
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    redis = Redis.fromEnv();
+  }
+} catch (e) {
+  console.warn("Redis configuration missing or invalid. Falling back to local file storage.");
+}
+
+// Helper to read data (Redis -> File Fallback)
+async function getData(): Promise<MaintenanceData> {
+  // Try Redis first
+  if (redis) {
+    try {
+      const data = await redis.get<MaintenanceData>(MAINTENANCE_KEY);
+      return data || { stationStatus: {}, outageLog: [] };
+    } catch (error) {
+      console.error("Redis Read Error:", error);
+      // Fall through to file if Redis fails? Or just return empty?
+      // For now, if Redis is configured but fails, we might want to return empty or error.
+      // But to be safe for mixed environments, let's just log and return empty.
+      return { stationStatus: {}, outageLog: [] };
+    }
+  }
+
+  // Fallback to file
+  try {
+    const fileContent = await fs.readFile(DATA_FILE_PATH, "utf-8");
+    return JSON.parse(fileContent);
+  } catch (error: any) {
+    // If file doesn't exist, return empty structure
+    if (error.code === "ENOENT") {
+      return { stationStatus: {}, outageLog: [] };
+    }
+    console.error("File Read Error:", error);
+    return { stationStatus: {}, outageLog: [] };
+  }
+}
+
+// Helper to write data (Redis -> File Fallback)
+async function saveData(data: MaintenanceData): Promise<boolean> {
+  // Try Redis first
+  if (redis) {
+    try {
+      await redis.set(MAINTENANCE_KEY, data);
+      return true;
+    } catch (error) {
+      console.error("Redis Write Error:", error);
+      return false;
+    }
+  }
+
+  // Fallback to file
+  try {
+    await fs.writeFile(DATA_FILE_PATH, JSON.stringify(data, null, 2));
+    return true;
+  } catch (error) {
+    console.error("File Write Error:", error);
+    return false;
+  }
+}
 
 // GET - Retrieve all maintenance data
 export async function GET() {
-  try {
-    const data = await redis.get<MaintenanceData>(MAINTENANCE_KEY);
-    return NextResponse.json(data || { stationStatus: {}, outageLog: [] });
-  } catch (error) {
-    console.error("Redis Error:", error);
-    return NextResponse.json({ stationStatus: {}, outageLog: [] });
-  }
+  const data = await getData();
+  return NextResponse.json(data);
 }
 
 // POST - Update station status and handle outage events
@@ -52,10 +110,7 @@ export async function POST(request: NextRequest) {
     }> = await request.json();
 
     // Get current data
-    let data = await redis.get<MaintenanceData>(MAINTENANCE_KEY);
-    if (!data) {
-      data = { stationStatus: {}, outageLog: [] };
-    }
+    let data = await getData();
 
     for (const update of updates) {
       const { icao, stationName, hasFlag, obsTime, observationTime } = update;
@@ -109,11 +164,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Save updated data
-    await redis.set(MAINTENANCE_KEY, data);
+    const success = await saveData(data);
+
+    if (!success) {
+      return NextResponse.json({ error: "Failed to persist data" }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Redis Error:", error);
+    console.error("API Error:", error);
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
   }
 }
@@ -121,10 +180,19 @@ export async function POST(request: NextRequest) {
 // DELETE - Clear all data
 export async function DELETE() {
   try {
-    await redis.del(MAINTENANCE_KEY);
+    if (redis) {
+      await redis.del(MAINTENANCE_KEY);
+    } else {
+      // Delete local file
+      try {
+        await fs.unlink(DATA_FILE_PATH);
+      } catch (e: any) {
+        if (e.code !== "ENOENT") throw e;
+      }
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Redis Error:", error);
+    console.error("Delete Error:", error);
     return NextResponse.json({ error: "Failed to clear" }, { status: 500 });
   }
 }
