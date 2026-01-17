@@ -1,4 +1,4 @@
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
 import { NextRequest, NextResponse } from "next/server";
 
 export interface OutageEvent {
@@ -22,14 +22,16 @@ interface MaintenanceData {
 
 const MAINTENANCE_KEY = "metar-maintenance-data";
 
+// Initialize Redis from environment variables
+const redis = Redis.fromEnv();
+
 // GET - Retrieve all maintenance data
 export async function GET() {
   try {
-    const data = await kv.get<MaintenanceData>(MAINTENANCE_KEY);
+    const data = await redis.get<MaintenanceData>(MAINTENANCE_KEY);
     return NextResponse.json(data || { stationStatus: {}, outageLog: [] });
   } catch (error) {
-    // If KV is not configured (local dev), return empty data
-    console.error("KV Error:", error);
+    console.error("Redis Error:", error);
     return NextResponse.json({ stationStatus: {}, outageLog: [] });
   }
 }
@@ -40,7 +42,7 @@ export async function POST(request: NextRequest) {
     const updates: Array<{ icao: string; stationName: string; hasFlag: boolean }> = await request.json();
 
     // Get current data
-    let data = await kv.get<MaintenanceData>(MAINTENANCE_KEY);
+    let data = await redis.get<MaintenanceData>(MAINTENANCE_KEY);
     if (!data) {
       data = { stationStatus: {}, outageLog: [] };
     }
@@ -86,11 +88,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Save updated data
-    await kv.set(MAINTENANCE_KEY, data);
+    await redis.set(MAINTENANCE_KEY, data);
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("KV Error:", error);
+    console.error("Redis Error:", error);
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
   }
 }
@@ -98,10 +100,10 @@ export async function POST(request: NextRequest) {
 // DELETE - Clear all data
 export async function DELETE() {
   try {
-    await kv.del(MAINTENANCE_KEY);
+    await redis.del(MAINTENANCE_KEY);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("KV Error:", error);
+    console.error("Redis Error:", error);
     return NextResponse.json({ error: "Failed to clear" }, { status: 500 });
   }
 }
