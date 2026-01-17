@@ -7,7 +7,7 @@ import { useAllUSMetars } from "@/hooks/useMetar";
 import { useMaintenanceStore, StationStats } from "@/stores/maintenanceStore";
 import { format, formatDistanceToNow } from "date-fns";
 
-type SortField = "totalOutages" | "totalDowntime" | "averageDowntime" | "longestOutage" | "firstOutage" | "lastOutage";
+type SortField = "totalOutages" | "totalDowntime" | "averageDowntime" | "longestOutage" | "downtimePercentage" | "firstOutage" | "lastOutage";
 type SortDirection = "asc" | "desc";
 
 function formatDuration(minutes: number): string {
@@ -93,6 +93,10 @@ export default function LeaderboardPage() {
         case "longestOutage":
           aVal = a.longestOutageMinutes;
           bVal = b.longestOutageMinutes;
+          break;
+        case "downtimePercentage":
+          aVal = a.downtimePercentage;
+          bVal = b.downtimePercentage;
           break;
         case "firstOutage":
           aVal = a.firstOutage || 0;
@@ -232,6 +236,12 @@ export default function LeaderboardPage() {
                   </th>
                   <th
                     className="text-left p-4 text-white/50 font-medium cursor-pointer hover:text-white transition-colors"
+                    onClick={() => handleSort("downtimePercentage")}
+                  >
+                    Down % {sortField === "downtimePercentage" && (sortDirection === "desc" ? "↓" : "↑")}
+                  </th>
+                  <th
+                    className="text-left p-4 text-white/50 font-medium cursor-pointer hover:text-white transition-colors"
                     onClick={() => handleSort("firstOutage")}
                   >
                     First Outage {sortField === "firstOutage" && (sortDirection === "desc" ? "↓" : "↑")}
@@ -247,7 +257,7 @@ export default function LeaderboardPage() {
               <tbody>
                 {sortedStats.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-white/50">
+                    <td colSpan={10} className="p-8 text-center text-white/50">
                       {isLoading || storeLoading
                         ? "Loading station data..."
                         : "No outage data yet. Stations will appear here when they have the $ maintenance flag."}
@@ -297,6 +307,16 @@ export default function LeaderboardPage() {
                       </td>
                       <td className="p-4 text-white">
                         {station.longestOutageMinutes > 0 ? formatDuration(station.longestOutageMinutes) : "--"}
+                      </td>
+                      <td className="p-4">
+                        <span className={`font-bold ${
+                          station.downtimePercentage >= 50 ? "text-red-400" :
+                          station.downtimePercentage >= 25 ? "text-orange-400" :
+                          station.downtimePercentage >= 10 ? "text-yellow-400" :
+                          "text-green-400"
+                        }`}>
+                          {station.downtimePercentage > 0 ? `${station.downtimePercentage}%` : "--"}
+                        </span>
                       </td>
                       <td className="p-4 text-white/60 text-sm">
                         {station.firstOutage

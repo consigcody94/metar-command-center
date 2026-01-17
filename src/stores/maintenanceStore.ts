@@ -23,6 +23,7 @@ export interface StationStats {
   lastOutage: number | null;
   currentlyDown: boolean;
   currentOutageStart: number | null;
+  downtimePercentage: number; // Percentage of tracked time station was down
 }
 
 interface StationStatus {
@@ -102,6 +103,8 @@ export const useMaintenanceStore = create<MaintenanceState>()((set, get) => ({
     const { outageLog } = get();
     const statsMap = new Map<string, StationStats>();
 
+    const now = Date.now();
+
     for (const event of outageLog) {
       let stats = statsMap.get(event.icao);
       if (!stats) {
@@ -116,6 +119,7 @@ export const useMaintenanceStore = create<MaintenanceState>()((set, get) => ({
           lastOutage: null,
           currentlyDown: false,
           currentOutageStart: null,
+          downtimePercentage: 0,
         };
         statsMap.set(event.icao, stats);
       }
@@ -137,7 +141,7 @@ export const useMaintenanceStore = create<MaintenanceState>()((set, get) => ({
       }
     }
 
-    // Calculate averages
+    // Calculate averages and downtime percentage
     const allStats = Array.from(statsMap.values());
     for (const stats of allStats) {
       const completedOutages = outageLog.filter(
@@ -147,6 +151,19 @@ export const useMaintenanceStore = create<MaintenanceState>()((set, get) => ({
         stats.averageDowntimeMinutes = Math.round(
           stats.totalDowntimeMinutes / completedOutages
         );
+      }
+
+      // Calculate downtime percentage
+      if (stats.firstOutage) {
+        const trackedTimeMinutes = (now - stats.firstOutage) / 60000;
+        // Add current ongoing outage time if station is down
+        let totalDowntime = stats.totalDowntimeMinutes;
+        if (stats.currentlyDown && stats.currentOutageStart) {
+          totalDowntime += (now - stats.currentOutageStart) / 60000;
+        }
+        if (trackedTimeMinutes > 0) {
+          stats.downtimePercentage = Math.round((totalDowntime / trackedTimeMinutes) * 100 * 10) / 10;
+        }
       }
     }
 
