@@ -54,7 +54,7 @@ For each station, view:
 - **Raw METAR** - Original report text
 - **Wind** - Direction arrow, speed, and gusts
 - **Visibility** - In statute miles
-- **Temperature** - In both Celsius and Fahrenheit
+- **Temperature** - Toggle between Celsius and Fahrenheit
 - **Dewpoint** - Current dewpoint temperature
 - **Altimeter** - Barometric pressure in inches of mercury
 - **Temp/Dew Spread** - Important for fog prediction
@@ -69,6 +69,14 @@ For each station, view:
 - Smooth Framer Motion animations
 - Fully responsive for mobile and desktop
 - Dark theme optimized for readability
+
+### 📈 ASOS Maintenance Leaderboard
+Track station outages across the US:
+- Real-time monitoring of $ maintenance flag
+- Tracks outage start/end times and duration
+- Leaderboard ranking by total outages, downtime, average duration
+- Historical outage log with timestamps
+- Server-side persistence using Vercel KV
 
 ---
 
@@ -258,6 +266,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [x] **Decoded METAR** - Human-readable breakdown
 - [x] **Dark/Light Theme** - User preference toggle
 - [x] **Keyboard Shortcuts** - Quick navigation
+- [x] **ASOS Maintenance Leaderboard** - Track station outages with $ flag
+- [x] **Temperature Toggle** - Switch between Celsius and Fahrenheit
 
 ---
 
@@ -271,6 +281,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - **[Axios](https://axios-http.com/)** - HTTP client
 - **[date-fns](https://date-fns.org/)** - Date utilities
 - **[Zustand](https://zustand-demo.pmnd.rs/)** - State management
+- **[Vercel KV](https://vercel.com/docs/storage/vercel-kv)** - Server-side Redis storage
+- **[Leaflet](https://leafletjs.com/)** - Interactive maps
 
 ---
 
