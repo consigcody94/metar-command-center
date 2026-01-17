@@ -6,88 +6,169 @@ import axios from "axios";
 export interface MetarData {
   icao: string;
   raw: string;
-  station_name?: string;
-  latitude?: number;
-  longitude?: number;
-  elevation_m?: number;
+  station_name: string;
+  latitude: number;
+  longitude: number;
+  elevation_m: number;
   observed_at: string;
-  // Zulu observation time from METAR (e.g., "171856Z")
-  observation_time?: string;
-  wind_direction?: number;
-  wind_speed_kt?: number;
-  wind_gust_kt?: number;
-  visibility_sm?: number;
-  temperature_c?: number;
-  dewpoint_c?: number;
-  altimeter_hg?: number;
+  observation_time: string;
+  wind_direction: number | null;
+  wind_speed_kt: number | null;
+  wind_gust_kt: number | null;
+  visibility_sm: number | string;
+  temperature_c: number | null;
+  dewpoint_c: number | null;
+  altimeter_hg: number | null;
   flight_category: "VFR" | "MVFR" | "IFR" | "LIFR";
-  clouds?: Array<{ cover: string; base_ft: number }>;
-  weather?: string[];
-  // ASOS maintenance flag - $ at end of METAR indicates maintenance needed
+  clouds: Array<{ cover: string; base_ft: number }>;
+  weather: string[];
   has_maintenance_flag: boolean;
+  metar_type: string;
 }
 
-// Parse raw METAR string
-function parseMetar(raw: string): Partial<MetarData> {
-  const result: Partial<MetarData> = {};
-
-  // Find observation time (format: ddhhmmZ - day, hour, minute, Zulu)
-  const timeMatch = raw.match(/\b(\d{6})Z\b/);
-  if (timeMatch) {
-    result.observation_time = timeMatch[1] + "Z";
-  }
-
-  // Find wind (format: dddssKT or dddssGggKT)
-  const windMatch = raw.match(/(\d{3}|VRB)(\d{2,3})(G(\d{2,3}))?KT/);
-  if (windMatch) {
-    result.wind_direction = windMatch[1] === "VRB" ? -1 : parseInt(windMatch[1]);
-    result.wind_speed_kt = parseInt(windMatch[2]);
-    if (windMatch[4]) result.wind_gust_kt = parseInt(windMatch[4]);
-  }
-
-  // Find visibility (SM format)
-  const visMatch = raw.match(/(\d+)\s*SM/);
-  if (visMatch) {
-    result.visibility_sm = parseInt(visMatch[1]);
-  }
-
-  // Find temperature/dewpoint (format: TT/DD or MTT/MDD)
-  const tempMatch = raw.match(/(M?\d{2})\/(M?\d{2})/);
-  if (tempMatch) {
-    result.temperature_c = tempMatch[1].startsWith("M")
-      ? -parseInt(tempMatch[1].slice(1))
-      : parseInt(tempMatch[1]);
-    result.dewpoint_c = tempMatch[2].startsWith("M")
-      ? -parseInt(tempMatch[2].slice(1))
-      : parseInt(tempMatch[2]);
-  }
-
-  // Find altimeter (format: Axxxx)
-  const altMatch = raw.match(/A(\d{4})/);
-  if (altMatch) {
-    result.altimeter_hg = parseInt(altMatch[1]) / 100;
-  }
-
-  // Determine flight category
-  result.flight_category = determineFlightCategory(result.visibility_sm, raw);
-
-  return result;
+export interface TafData {
+  icao: string;
+  raw: string;
+  station_name: string;
+  issue_time: string;
+  valid_from: string;
+  valid_to: string;
+  forecasts: Array<{
+    from: string;
+    to: string;
+    wind_direction: number | null;
+    wind_speed_kt: number | null;
+    wind_gust_kt: number | null;
+    visibility_sm: number | string;
+    flight_category: "VFR" | "MVFR" | "IFR" | "LIFR";
+    clouds: Array<{ cover: string; base_ft: number }>;
+    weather: string[];
+    change_type?: string;
+  }>;
 }
 
-function determineFlightCategory(
-  visibility?: number,
-  raw?: string
+// API response type from aviationweather.gov JSON format
+interface AwcMetarResponse {
+  icaoId: string;
+  rawOb: string;
+  name: string;
+  lat: number;
+  lon: number;
+  elev: number;
+  obsTime: number;
+  reportTime: string;
+  temp: number | null;
+  dewp: number | null;
+  wdir: number | string | null;
+  wspd: number | null;
+  wgst: number | null;
+  visib: number | string;
+  altim: number | null;
+  fltCat: string;
+  clouds: Array<{ cover: string; base: number }>;
+  wxString?: string;
+  metarType: string;
+}
+
+interface AwcTafResponse {
+  icaoId: string;
+  rawTAF: string;
+  name: string;
+  issueTime: string;
+  validTimeFrom: number;
+  validTimeTo: number;
+  fcsts: Array<{
+    timeFrom: number;
+    timeTo: number;
+    wdir: number | string | null;
+    wspd: number | null;
+    wgst: number | null;
+    visib: number | string;
+    clouds: Array<{ cover: string; base: number }>;
+    wxString?: string;
+    fcstChange?: string;
+  }>;
+}
+
+const API_BASE = "/api/metar";
+
+// Convert AWC response to our MetarData format
+function transformMetar(awc: AwcMetarResponse): MetarData {
+  const hasMaintenanceFlag = awc.rawOb?.trim().endsWith("$") || false;
+
+  // Parse observation time from raw METAR
+  const timeMatch = awc.rawOb?.match(/\b(\d{6})Z\b/);
+  const observationTime = timeMatch ? timeMatch[1] + "Z" : "";
+
+  return {
+    icao: awc.icaoId,
+    raw: awc.rawOb || "",
+    station_name: awc.name || awc.icaoId,
+    latitude: awc.lat,
+    longitude: awc.lon,
+    elevation_m: awc.elev ? awc.elev * 0.3048 : 0, // Convert ft to m
+    observed_at: awc.reportTime || new Date().toISOString(),
+    observation_time: observationTime,
+    wind_direction: typeof awc.wdir === "number" ? awc.wdir : null,
+    wind_speed_kt: awc.wspd,
+    wind_gust_kt: awc.wgst,
+    visibility_sm: awc.visib ?? 10,
+    temperature_c: awc.temp,
+    dewpoint_c: awc.dewp,
+    altimeter_hg: awc.altim ? awc.altim / 33.8639 : null, // Convert hPa to inHg
+    flight_category: (awc.fltCat as MetarData["flight_category"]) || "VFR",
+    clouds: (awc.clouds || []).map((c) => ({
+      cover: c.cover,
+      base_ft: c.base || 0,
+    })),
+    weather: awc.wxString ? awc.wxString.split(" ") : [],
+    has_maintenance_flag: hasMaintenanceFlag,
+    metar_type: awc.metarType || "METAR",
+  };
+}
+
+// Convert AWC TAF response to our TafData format
+function transformTaf(awc: AwcTafResponse): TafData {
+  return {
+    icao: awc.icaoId,
+    raw: awc.rawTAF || "",
+    station_name: awc.name || awc.icaoId,
+    issue_time: awc.issueTime,
+    valid_from: new Date(awc.validTimeFrom * 1000).toISOString(),
+    valid_to: new Date(awc.validTimeTo * 1000).toISOString(),
+    forecasts: (awc.fcsts || []).map((f) => ({
+      from: new Date(f.timeFrom * 1000).toISOString(),
+      to: new Date(f.timeTo * 1000).toISOString(),
+      wind_direction: typeof f.wdir === "number" ? f.wdir : null,
+      wind_speed_kt: f.wspd,
+      wind_gust_kt: f.wgst,
+      visibility_sm: f.visib ?? 10,
+      flight_category: determineFltCat(f.visib, f.clouds),
+      clouds: (f.clouds || []).map((c) => ({
+        cover: c.cover,
+        base_ft: c.base || 0,
+      })),
+      weather: f.wxString ? f.wxString.split(" ") : [],
+      change_type: f.fcstChange,
+    })),
+  };
+}
+
+// Determine flight category from visibility and clouds
+function determineFltCat(
+  visib: number | string | undefined,
+  clouds: Array<{ cover: string; base: number }> | undefined
 ): "VFR" | "MVFR" | "IFR" | "LIFR" {
   let ceiling = Infinity;
-  const cloudMatches = raw?.matchAll(/(BKN|OVC|VV)(\d{3})/g);
-  if (cloudMatches) {
-    for (const match of cloudMatches) {
-      const height = parseInt(match[2]) * 100;
-      if (height < ceiling) ceiling = height;
+  if (clouds) {
+    for (const c of clouds) {
+      if ((c.cover === "BKN" || c.cover === "OVC" || c.cover === "VV") && c.base < ceiling) {
+        ceiling = c.base;
+      }
     }
   }
 
-  const vis = visibility ?? 10;
+  const vis = typeof visib === "number" ? visib : 10;
 
   if (ceiling < 500 || vis < 1) return "LIFR";
   if (ceiling < 1000 || vis < 3) return "IFR";
@@ -95,44 +176,40 @@ function determineFlightCategory(
   return "VFR";
 }
 
-// Use local API proxy to avoid CORS
-const API_BASE = "/api/metar";
-
 // Fetch single METAR by ICAO code
 async function fetchMetar(icao: string): Promise<MetarData | null> {
   try {
     const cleanIcao = icao.toUpperCase().trim();
-    const response = await axios.get(`${API_BASE}?ids=${cleanIcao}&hours=2`);
-    const raw = response.data.trim();
+    const response = await axios.get(`${API_BASE}?ids=${cleanIcao}&format=json&hours=2`);
+    const data = response.data;
 
-    console.log(`METAR response for ${cleanIcao}:`, raw);
-
-    if (!raw || raw.includes("No METAR") || raw.includes("error") || raw.length < 10) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       console.log(`No valid METAR for ${cleanIcao}`);
       return null;
     }
 
-    // Get the most recent METAR line
-    const latestRaw = raw.split("\n")[0].trim();
-    const parsed = parseMetar(latestRaw);
-
-    // Check for $ flag at end (ASOS maintenance indicator)
-    const hasMaintenanceFlag = latestRaw.endsWith("$");
-
-    // Extract actual ICAO from the METAR line (skip METAR/SPECI prefix)
-    const icaoMatch = latestRaw.match(/(?:METAR|SPECI)?\s*([KP][A-Z0-9]{3})\s/);
-    const actualIcao = icaoMatch ? icaoMatch[1] : cleanIcao;
-
-    return {
-      icao: actualIcao,
-      raw: latestRaw,
-      observed_at: new Date().toISOString(),
-      flight_category: parsed.flight_category || "VFR",
-      has_maintenance_flag: hasMaintenanceFlag,
-      ...parsed,
-    };
+    return transformMetar(data[0]);
   } catch (error) {
     console.error(`Failed to fetch METAR for ${icao}:`, error);
+    return null;
+  }
+}
+
+// Fetch TAF by ICAO code
+async function fetchTaf(icao: string): Promise<TafData | null> {
+  try {
+    const cleanIcao = icao.toUpperCase().trim();
+    const response = await axios.get(`${API_BASE}?ids=${cleanIcao}&format=json&type=taf`);
+    const data = response.data;
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      console.log(`No valid TAF for ${cleanIcao}`);
+      return null;
+    }
+
+    return transformTaf(data[0]);
+  } catch (error) {
+    console.error(`Failed to fetch TAF for ${icao}:`, error);
     return null;
   }
 }
@@ -155,42 +232,14 @@ async function fetchAllUSMetars(): Promise<MetarData[]> {
     const batch = states.slice(i, i + batchSize);
     const promises = batch.map(async (state) => {
       try {
-        const response = await axios.get(`${API_BASE}?ids=@${state}&hours=1`, {
+        const response = await axios.get(`${API_BASE}?ids=@${state}&format=json&hours=1`, {
           timeout: 15000,
         });
 
-        const lines = response.data
-          .trim()
-          .split("\n")
-          .filter((l: string) => l.trim() && !l.includes("error"));
+        const data = response.data;
+        if (!data || !Array.isArray(data)) return [];
 
-        return lines.map((line: string) => {
-          // METAR format: "METAR KORD 171856Z..." or "SPECI KORD 171856Z..." or just "KORD 171856Z..."
-          // The ICAO is the 4-letter code AFTER METAR/SPECI, or the first 4-letter code starting with K or P
-          const parts = line.trim().split(/\s+/);
-          let icaoCode = null;
-          for (const part of parts) {
-            // Skip METAR, SPECI, and find first K*** or P*** code
-            if (part.match(/^[KP][A-Z0-9]{3}$/)) {
-              icaoCode = part;
-              break;
-            }
-          }
-          if (icaoCode) {
-            const parsed = parseMetar(line);
-            const hasMaintenanceFlag = line.trim().endsWith("$");
-            return {
-              icao: icaoCode,
-              raw: line.trim(),
-              observed_at: new Date().toISOString(),
-              observation_time: parsed.observation_time,
-              flight_category: parsed.flight_category || "VFR",
-              has_maintenance_flag: hasMaintenanceFlag,
-              ...parsed,
-            } as MetarData;
-          }
-          return null;
-        }).filter(Boolean);
+        return data.map((item: AwcMetarResponse) => transformMetar(item));
       } catch {
         return [];
       }
@@ -208,7 +257,6 @@ async function fetchAllUSMetars(): Promise<MetarData[]> {
       stationMap.set(metar.icao, metar);
     } else {
       // Compare observation times - keep the newer one
-      // Format is DDHHMMZ (day, hour, minute)
       const existingTime = existing.observation_time || "000000Z";
       const newTime = metar.observation_time || "000000Z";
       if (newTime > existingTime) {
@@ -231,12 +279,102 @@ export function useMetar(icao: string | null) {
   });
 }
 
+// Hook for TAF
+export function useTaf(icao: string | null) {
+  return useQuery({
+    queryKey: ["taf", icao],
+    queryFn: () => (icao ? fetchTaf(icao) : null),
+    enabled: !!icao && icao.length >= 4,
+    staleTime: 15 * 60 * 1000,
+    refetchInterval: 15 * 60 * 1000,
+  });
+}
+
 // Hook for all US METARs
 export function useAllUSMetars() {
   return useQuery({
     queryKey: ["all-us-metars"],
     queryFn: fetchAllUSMetars,
-    staleTime: 30 * 60 * 1000, // 30 minutes
-    refetchInterval: 60 * 60 * 1000, // Auto-refresh every hour
+    staleTime: 30 * 60 * 1000,
+    refetchInterval: 60 * 60 * 1000,
   });
+}
+
+// Weather phenomenon decoder
+export const weatherCodes: Record<string, string> = {
+  // Intensity
+  "-": "Light",
+  "+": "Heavy",
+  // Descriptor
+  MI: "Shallow",
+  PR: "Partial",
+  BC: "Patches",
+  DR: "Low Drifting",
+  BL: "Blowing",
+  SH: "Showers",
+  TS: "Thunderstorm",
+  FZ: "Freezing",
+  // Precipitation
+  DZ: "Drizzle",
+  RA: "Rain",
+  SN: "Snow",
+  SG: "Snow Grains",
+  IC: "Ice Crystals",
+  PL: "Ice Pellets",
+  GR: "Hail",
+  GS: "Small Hail",
+  UP: "Unknown Precipitation",
+  // Obscuration
+  BR: "Mist",
+  FG: "Fog",
+  FU: "Smoke",
+  VA: "Volcanic Ash",
+  DU: "Widespread Dust",
+  SA: "Sand",
+  HZ: "Haze",
+  PY: "Spray",
+  // Other
+  PO: "Dust Whirls",
+  SQ: "Squalls",
+  FC: "Funnel Cloud",
+  SS: "Sandstorm",
+  DS: "Duststorm",
+  VC: "Vicinity",
+};
+
+// Cloud cover decoder
+export const cloudCoverCodes: Record<string, string> = {
+  SKC: "Sky Clear",
+  CLR: "Clear",
+  FEW: "Few (1-2 oktas)",
+  SCT: "Scattered (3-4 oktas)",
+  BKN: "Broken (5-7 oktas)",
+  OVC: "Overcast (8 oktas)",
+  VV: "Vertical Visibility",
+};
+
+// Decode weather string
+export function decodeWeather(wx: string): string {
+  let result = "";
+  let intensity = "";
+
+  if (wx.startsWith("-")) {
+    intensity = "Light ";
+    wx = wx.slice(1);
+  } else if (wx.startsWith("+")) {
+    intensity = "Heavy ";
+    wx = wx.slice(1);
+  }
+
+  // Match 2-character codes
+  const codes: string[] = [];
+  for (let i = 0; i < wx.length; i += 2) {
+    const code = wx.slice(i, i + 2);
+    if (weatherCodes[code]) {
+      codes.push(weatherCodes[code]);
+    }
+  }
+
+  result = intensity + codes.join(" ");
+  return result || wx;
 }
